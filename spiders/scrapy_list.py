@@ -12,11 +12,17 @@ def get_fundcode():
     header = {}
     header['user-agent'] = get_header()
     res = requests.get('http://fund.eastmoney.com/js/fundcode_search.js', headers=header)
-    js_content = execjs.compile(res)
-    print(type(js_content))
-    # r = js_content.eval("r")
-    # print(js_content)
-    print(js_content.eval('r'))
+    a = res.text.replace('var r = ', '').replace(';', '')
+    fund_list = json.loads(a)
+    final = []
+    for i in fund_list[:10]:
+        temp = {}
+        temp['fund_code'] = i[0]
+        temp['fund_name_en'] = i[1]
+        temp['fund_name_cn'] = i[2]
+        temp['fund_type'] = i[3]
+        final.append(temp)
+    return final
 
 
 if __name__ == '__main__':
