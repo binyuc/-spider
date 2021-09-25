@@ -1,41 +1,58 @@
 import execjs
 import requests
+from loguru import logger
+import sys
+import pandas as pd
 
-url='http://fund.eastmoney.com/pingzhongdata/000001.js'
-res = requests.get(url)
 
-js_content = execjs.compile(res.text)
-date_map = {
-            "source_rate": "fund_sourceRate",
-            "rate": "fund_Rate",
-            "minimum_purchase_amount": "fund_minsg",
-            "stock_codes": "stockCodes",
-            "zq_codes": "zqCodes",
-            "new_stock_codes": "stockCodesNew",
-            "new_zq_codes": "zqCodesNew",
-            "annual_income": "syl_1n", # 1年
-            "half_year_income": "syl_6y", #
-            "quarterly_revenue": "syl_3y",
-            "monthly_income": "syl_1y",
-            "position_calculation_chart": "Data_fundSharesPositions",
-            "net_worth_trend": "Data_netWorthTrend",
-            # "cumulative_net_worth_trend": "Data_ACWorthTrend",
-            "cumulative_rate_of_return_trend": "Data_grandTotal", # 累计收益率走势
-            "rate_in_similar_type": "Data_rateInSimilarType", # 同类走势排名
-            "rate_in_similar_persent": "Data_rateInSimilarPersent",
-            "fluctuation_scale": "Data_fluctuationScale", # 规模变化
-            "holder_structure": "Data_holderStructure", # 持有人变化
-            "asset_allocation": "Data_assetAllocation", # 资产配置
-            "performance_evaluation": "Data_performanceEvaluation",
-            "current_fund_manager": "Data_currentFundManager", # 现任基金经理
-            "buy_sedemption": "Data_buySedemption", # 申购赎回
-            "swith_same_type": "swithSameType", # 同类型基金涨幅榜
-            "million_copies_income": "Data_millionCopiesIncome",
-            "seven_days_year_income": "Data_sevenDaysYearIncome",
-            "asset_allocation_currency": "Data_assetAllocationCurrency",
+class DetailSpider(object):
+    def __init__(self):
+        logger.remove()
+        logger.add(sys.stderr, backtrace=False, diagnose=False)
+
+        self.final = []
+
+    def solo_spider(self, url: str):
+        '''
+        单线程爬虫程序
+        :param url:
+        :return:
+        '''
+        # todo adding retries
+        res = requests.get(url)
+        js_content = execjs.compile(res.text)
+        parse_list={
+            'fund_name_cn' : 'fS_name',
+            'fund_code' : 'fS_code',
+            'fund_original_rate' : 'fund_sourceRate',
+            'fund_current_rate' : 'fund_Rate',
+            'mini_buy_amount' : 'fund_minsg',
+            'hold_stocks_list' : 'stockCodes',
+            'hold_bond_list' :'zqCodes', #基金持仓债券代码
+            '':'', #基金持仓股票代码(新市场号),
+            '':'',
         }
-for key, name in date_map.items():
-    value = js_content.eval(name)
-    print(value)
-# print(res.text)
+        final = {}
+        for key, name in parse_list.items():
+            temp = {}
+            value = js_content.eval(name)
+            temp[key] = value
+            final.update(temp)
+        # print(pd.DataFrame(final))
+        print(final)
+
+    def saver(self):
+        pass
+
+    def cleaner(self):
+        pass
+
+    def run_spider(self, url):
+        self.solo_spider(url=url)
+
+
+if __name__ == '__main__':
+    url = 'http://fund.eastmoney.com/pingzhongdata/000001.js'
+    DetailSpider().run_spider(url)
+
 
