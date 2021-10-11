@@ -26,8 +26,9 @@ def get_fundcode():
         temp['fund_type'] = i[3]
         final.append(temp)
     final = pd.DataFrame(final)
-    print(final.info())
-    MysqlWriter(target=None, database_name='bond_db').write_df(table_name='')
+    MysqlWriter(target=None, database_name='bond_db').write_df(table_name='bond_list', new_df=final,
+                                                               )
+
 
 if __name__ == '__main__':
     get_fundcode()
