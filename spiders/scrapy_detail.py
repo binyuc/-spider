@@ -20,6 +20,7 @@ class DetailSpider(object):
         logger.add(sys.stderr, backtrace=False, diagnose=False)
 
         self.final = []
+        self.bond_info_df = []
 
     def get_url_list(self):
         ''':param
@@ -33,7 +34,6 @@ class DetailSpider(object):
         for i in df['fund_code'].to_list():
             url = f'http://fund.eastmoney.com/pingzhongdata/{i}.js'
             url_list.append(url)
-
         logger.info(f'url_list length is {len(url_list)}')
         return url_list
 
@@ -41,10 +41,44 @@ class DetailSpider(object):
         '''
         单线程爬虫程序
         :param url:
-        :return:
+        :return: None
         '''
         # todo adding retries
         res = requests.get(url)
+        try:
+            bond_info = self.parser(res)
+            self.bond_info_df.append(bond_info)
+            logger.debug(f'successfully get bond detail current  result length is {len(self.bond_info_df)}')
+        except Exception as e:
+            logger.warning(f'cannot parse bond details, url is {url}')
+            pass
+
+            
+        # parse_list2 = {
+        #     'fund_name_cn': 'fS_name',
+        #     'fund_code': 'fS_code',
+        #     'Data_netWorthTrend': 'Data_netWorthTrend',  # 单位净值走势
+        #     'Data_ACWorthTrend': 'Data_ACWorthTrend',  # 累计净值走势
+        #     'Data_grandTotal': 'Data_grandTotal',  # 累计收益率走势
+        #     'Data_rateInSimilarType': 'Data_rateInSimilarType',  # 同类排名走势
+        #     'Data_rateInSimilarPersent': 'Data_rateInSimilarPersent',  # 同类排名百分比
+        # }
+        # 
+        # bond_value = {}
+        # 
+        # for key, name in parse_list2.items():
+        #     temp = {}
+        #     value = js_content.eval(name)
+        #     temp[key] = value
+        #     bond_value.update(temp)
+
+        return
+
+    def parser(self, res):
+        '''
+        解析函数1，返回基金信息
+        :return： 某一个基金的info dict
+        '''
         js_content = execjs.compile(res.text)
         parse_list = {
             'fund_name_cn': 'fS_name',
@@ -68,17 +102,7 @@ class DetailSpider(object):
             'Data_buySedemption': 'Data_buySedemption',  # 申购赎回
             'swithSameType': 'swithSameType',  # 同类型基金涨幅榜
         }
-        parse_list2 = {
-            'fund_name_cn': 'fS_name',
-            'fund_code': 'fS_code',
-            'Data_netWorthTrend': 'Data_netWorthTrend',  # 单位净值走势
-            'Data_ACWorthTrend': 'Data_ACWorthTrend',  # 累计净值走势
-            'Data_grandTotal': 'Data_grandTotal',  # 累计收益率走势
-            'Data_rateInSimilarType': 'Data_rateInSimilarType',  # 同类排名走势
-            'Data_rateInSimilarPersent': 'Data_rateInSimilarPersent',  # 同类排名百分比
-        }
         bond_info = {}
-        bond_value = {}
         for key, name in parse_list.items():
             temp = {}
             value = js_content.eval(name)
@@ -97,19 +121,9 @@ class DetailSpider(object):
         bond_info['Data_currentFundManager'] = json.dumps(bond_info['Data_currentFundManager'], ensure_ascii=False)
         bond_info['Data_buySedemption'] = json.dumps(bond_info['Data_buySedemption'], ensure_ascii=False)
         bond_info['swithSameType'] = json.dumps(bond_info['swithSameType'], ensure_ascii=False)
-
-        for key, name in parse_list2.items():
-            temp = {}
-            value = js_content.eval(name)
-            temp[key] = value
-            bond_value.update(temp)
-
         return bond_info
 
-    def saver(self, df):
-        pass
-
-    def cleaner(self):
+    def parser2(self):
         pass
 
     def multi_thread_func(self, url_list):
@@ -130,17 +144,19 @@ class DetailSpider(object):
         logger.debug('-----------------------end-----------------------')
 
     def run_spider(self):
-        self.bond_info_df = []
         url_list = self.get_url_list()
-        for mark, url in enumerate(url_list[:10]):
-            try:
-                self.bond_info_df.append(self.solo_spider(url=url))
-                logger.debug(
-                    f'successfully get bond detail current bond is {mark}, result length is {len(self.bond_info_df)}')
-            except Exception as e:
-                logger.warning(f'cannot parse bond details, url is {url}, mark is {mark}')
+        self.multi_thread_func(url_list[:100])
+        # for mark, url in enumerate(url_list[:10]):
+        #     try:
+        #         self.bond_info_df.append(self.solo_spider(url=url))
+        #         logger.debug(
+        #             f'successfully get bond detail current bond is {mark}, result length is {len(self.bond_info_df)}')
+        #     except Exception as e:
+        #         logger.warning(f'cannot parse bond details, url is {url}, mark is {mark}')
         bond_info_df = pd.DataFrame(self.bond_info_df)
-        MysqlWriter(target=None, database_name='bond_db').write_df(table_name='bond_info', new_df=bond_info_df, method='append')
+        print(bond_info_df)
+        # MysqlWriter(target=None, database_name='bond_db').write_df(table_name='bond_info', new_df=bond_info_df,
+        #                                                            method='append')
 
 
 if __name__ == '__main__':
