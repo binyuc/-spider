@@ -1,4 +1,5 @@
 create table if not exists bond_db.bond_info(
+    ID INT  PRIMARY KEY AUTO_INCREMENT,
     fund_code varchar(255) comment '基金代码',
     fund_name_cn varchar(255) comment '基金中文名称',
     fund_original_rate varchar(255) comment '原费率',

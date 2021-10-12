@@ -8,10 +8,44 @@ import pandas as pd
 import json
 from db_files.binyu_mysql_reader import MysqlReader
 from db_files.binyu_mysql_writer import MysqlWriter
+import random
 
 
 class DetailSpider(object):
     def __init__(self):
+        self.user_agent = [
+            "Mozilla/5.0 (Macintosh; U; Intel Mac OS X 10_6_8; en-us) AppleWebKit/534.50 (KHTML, like Gecko) Version/5.1 Safari/534.50",
+            "Mozilla/5.0 (Windows; U; Windows NT 6.1; en-us) AppleWebKit/534.50 (KHTML, like Gecko) Version/5.1 Safari/534.50",
+            "Mozilla/5.0 (Windows NT 10.0; WOW64; rv:38.0) Gecko/20100101 Firefox/38.0",
+            "Mozilla/5.0 (Windows NT 10.0; WOW64; Trident/7.0; .NET4.0C; .NET4.0E; .NET CLR 2.0.50727; .NET CLR 3.0.30729; .NET CLR 3.5.30729; InfoPath.3; rv:11.0) like Gecko",
+            "Mozilla/5.0 (compatible; MSIE 9.0; Windows NT 6.1; Trident/5.0)",
+            "Mozilla/4.0 (compatible; MSIE 8.0; Windows NT 6.0; Trident/4.0)",
+            "Mozilla/4.0 (compatible; MSIE 7.0; Windows NT 6.0)",
+            "Mozilla/4.0 (compatible; MSIE 6.0; Windows NT 5.1)",
+            "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.6; rv:2.0.1) Gecko/20100101 Firefox/4.0.1",
+            "Mozilla/5.0 (Windows NT 6.1; rv:2.0.1) Gecko/20100101 Firefox/4.0.1",
+            "Opera/9.80 (Macintosh; Intel Mac OS X 10.6.8; U; en) Presto/2.8.131 Version/11.11",
+            "Opera/9.80 (Windows NT 6.1; U; en) Presto/2.8.131 Version/11.11",
+            "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_7_0) AppleWebKit/535.11 (KHTML, like Gecko) Chrome/17.0.963.56 Safari/535.11",
+            "Mozilla/4.0 (compatible; MSIE 7.0; Windows NT 5.1; Maxthon 2.0)",
+            "Mozilla/4.0 (compatible; MSIE 7.0; Windows NT 5.1; TencentTraveler 4.0)",
+            "Mozilla/4.0 (compatible; MSIE 7.0; Windows NT 5.1)",
+            "Mozilla/4.0 (compatible; MSIE 7.0; Windows NT 5.1; The World)",
+            "Mozilla/4.0 (compatible; MSIE 7.0; Windows NT 5.1; Trident/4.0; SE 2.X MetaSr 1.0; SE 2.X MetaSr 1.0; .NET CLR 2.0.50727; SE 2.X MetaSr 1.0)",
+            "Mozilla/4.0 (compatible; MSIE 7.0; Windows NT 5.1; 360SE)",
+            "Mozilla/4.0 (compatible; MSIE 7.0; Windows NT 5.1; Avant Browser)",
+            "Mozilla/4.0 (compatible; MSIE 7.0; Windows NT 5.1)",
+            "MQQBrowser/26 Mozilla/5.0 (Linux; U; Android 2.3.7; zh-cn; MB200 Build/GRJ22; CyanogenMod-7) AppleWebKit/533.1 (KHTML, like Gecko) Version/4.0 Mobile Safari/533.1",
+            "Opera/9.80 (Android 2.3.4; Linux; Opera Mobi/build-1107180945; U; en-GB) Presto/2.8.149 Version/11.10",
+            "Mozilla/5.0 (BlackBerry; U; BlackBerry 9800; en) AppleWebKit/534.1+ (KHTML, like Gecko) Version/6.0.0.337 Mobile Safari/534.1+",
+            "Mozilla/5.0 (hp-tablet; Linux; hpwOS/3.0.0; U; en-US) AppleWebKit/534.6 (KHTML, like Gecko) wOSBrowser/233.70 Safari/534.6 TouchPad/1.0",
+            "Mozilla/5.0 (SymbianOS/9.4; Series60/5.0 NokiaN97-1/20.0.019; Profile/MIDP-2.1 Configuration/CLDC-1.1) AppleWebKit/525 (KHTML, like Gecko) BrowserNG/7.1.18124",
+            "Mozilla/5.0 (compatible; MSIE 9.0; Windows Phone OS 7.5; Trident/5.0; IEMobile/9.0; HTC; Titan)",
+            "UCWEB7.0.2.37/28/999",
+            "NOKIA5700/ UCWEB7.0.2.37/28/999",
+            "Openwave/ UCWEB7.0.2.37/28/999",
+            "Mozilla/4.0 (compatible; MSIE 6.0; ) Opera/UCWEB7.0.2.37/28/999",
+        ]
         logger.remove()
         logger.add(sys.stderr, backtrace=False, diagnose=False)
 
@@ -41,7 +75,18 @@ class DetailSpider(object):
         :return: None
         '''
         # todo adding retries
-        res = requests.get(url)
+        headers = {}
+        headers['User-Agent'] = random.choice(self.user_agent)
+        try_times = 0
+        while try_times <= 3:
+            try:
+                res = requests.get(url, headers=headers, timeout=10)
+                break
+            except Exception as e:
+                try_times += 1
+                logger.warning(f'子线程出错，retring 第{try_times}次')
+                if try_times >= 3:
+                    logger.error(e)
         try:
             bond_info = self.parser(res)
             self.bond_info_df.append(bond_info)
@@ -55,9 +100,9 @@ class DetailSpider(object):
             self.bond_value_df.append(bond_value)
             logger.debug(f'successfully get bond value current result length is {len(self.bond_value_df)}')
         except Exception as e:
-            logger.warning(f'cannot parse bond details, url is {url}')
+            logger.warning(f'cannot parse bond value , url is {url}')
             pass
-
+        # print(pd.DataFrame(self.bond_value_df, index=[0]))
         return
 
     def parser(self, res):
@@ -91,8 +136,11 @@ class DetailSpider(object):
         bond_info = {}
         for key, name in parse_list.items():
             temp = {}
-            value = js_content.eval(name)
-            temp[key] = value
+            try:
+                value = js_content.eval(name)
+                temp[key] = value
+            except:
+                temp[key] = ''
             bond_info.update(temp)
 
         bond_info['hold_stocks_list'] = json.dumps(bond_info['hold_stocks_list'], ensure_ascii=False)
@@ -124,11 +172,14 @@ class DetailSpider(object):
         js_content = execjs.compile(res.text)
         for key, name in parse_list2.items():
             temp = {}
-            value = js_content.eval(name)
-            temp[key] = value
+            try:
+                value = js_content.eval(name)
+                temp[key] = value
+            except:
+                temp[key] = ''
             bond_value.update(temp)
 
-        bond_value['hold_stocks_list'] = json.dumps(bond_value['Data_netWorthTrend'], ensure_ascii=False)
+        bond_value['Data_netWorthTrend'] = json.dumps(bond_value['Data_netWorthTrend'], ensure_ascii=False)
         bond_value['Data_ACWorthTrend'] = json.dumps(bond_value['Data_ACWorthTrend'], ensure_ascii=False)
         bond_value['Data_grandTotal'] = json.dumps(bond_value['Data_grandTotal'], ensure_ascii=False)
         bond_value['Data_rateInSimilarType'] = json.dumps(bond_value['Data_rateInSimilarType'], ensure_ascii=False)
@@ -142,7 +193,7 @@ class DetailSpider(object):
         global pool_sema
         logger.debug('-----------------------begin-----------------------')
         threads = []
-        max_connections = 16
+        max_connections = 8
         pool_sema = threading.BoundedSemaphore(max_connections)
         for url in url_list:
             threads.append(
@@ -157,8 +208,8 @@ class DetailSpider(object):
     def saver(self):
         pass
 
-    def split_list_by_n(self, target_list, n=500):
-        '''将目标切成按1000的长度切分'''
+    def split_list_by_n(self, target_list, n=100):
+        '''将目标切成按100的长度切分'''
         url_list_collection = []
         for i in range(0, len(target_list), n):
             url_list_collection.append(target_list[i: i + n])
@@ -168,17 +219,22 @@ class DetailSpider(object):
         '''执行程序'''
         url_list = self.get_url_list()
         url_list_collection = self.split_list_by_n(url_list)
-        for mark, url_list in enumerate(url_list_collection[:2]):
+        # todo 记得修改url_list_collection的起始位置
+        for mark, url_list in enumerate(url_list_collection[9:]):
             self.multi_thread_func(url_list)
-            MysqlWriter(target=None, database_name='bond_db').write_df(table_name='bond_info', new_df=self.bond_info_df,
+            bond_info_df = pd.DataFrame(self.bond_info_df)
+            bond_value_df = pd.DataFrame(self.bond_value_df)
+            MysqlWriter(target=None, database_name='bond_db').write_df(table_name='bond_info', new_df=bond_info_df,
+                                                                       method='append')
+            MysqlWriter(target=None, database_name='bond_db').write_df(table_name='bond_value',
+                                                                       new_df=bond_value_df,
                                                                        method='append')
             self.bond_info_df = []
+            self.bond_value_df = []
             logger.info(f'current collection is NO.{mark}')
-        bond_info_df = pd.DataFrame(self.bond_info_df)
-        print(bond_info_df)
-        #
 
 
 if __name__ == '__main__':
     url = 'http://fund.eastmoney.com/pingzhongdata/000001.js'
+    # DetailSpider().solo_spider(url)
     DetailSpider().run_spider()
